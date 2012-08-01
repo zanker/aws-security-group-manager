@@ -1,0 +1,44 @@
+#!/usr/bin/env ruby
+$LOAD_PATH.unshift File.expand_path(File.dirname(__FILE__) + "/../lib")
+
+require "optparse"
+require "aws-security-group-manager"
+
+options = {:aws_access_key => ENV["AWS_ACCESS_KEY"], :aws_secret_key => ENV["AWS_SECRET_KEY"]}
+
+OptionParser.new do |opts|
+  opts.banner = "Usage: #{__FILE__} [options]"
+
+  opts.separator("")
+  opts.on("--config", "-s", String, :REQUIRED, "Configuration file to base security group changes off of") {|v| options[:config] = v}
+  opts.on("--assumeyes", "-y", :OPTIONAL, "Doesn't confirm before changing security groups") {|v| options[:assumeyes] = true}
+  opts.on("--noop", :OPTIONAL, "No changes are made, just a list of changes it would make and it exits") {|v| options[:noop] = true}
+
+  opts.on("--aws-access-key", "-O", String, :OPTIONAL, "AWS Access key to use. Defaults to the value of AWS_ACCESS_KEY") {|v| options[:aws_access_key] = v}
+  opts.on("--aws-secret-key", "-W", String, :OPTIONAL, "AWS Secret key to use. Defaults to the value of AWS_SECRET_KEY") {|v| options[:aws_secret_key] = v}
+end.parse!
+
+if options[:aws_access_key].nil? or options[:aws_access_key] == ""
+  puts "*** No AWS Access key specified"
+  exit
+end
+
+if options[:aws_secret_key].nil? or options[:aws_secret_key] == ""
+  puts "*** No AWS Secret key specified"
+  exit
+end
+
+unless File.exists?(options[:config])
+  puts "*** Cannot laod configuration file"
+  exit
+end
+
+core = EC2SecurityGroups::Core.new(options[:aws_access_key], options[:aws_secret_key])
+core.load_regions
+core.load_security_groups
+core.load_servers
+
+group_config = YAML::load(File.read(options[:config]))
+group_config.each do |product, config|
+  core.build_security_groups(product, config)
+end
