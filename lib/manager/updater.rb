@@ -20,13 +20,23 @@ module AWSSecurityGroups
 
     private
     # EC2
+    def format_ec2_rule(rule)
+      if rule[:ip]
+        if rule[:port] =~ /\-/
+          from, to = rule[:port].split("-", 2)
+        else
+          from, to = rule[:port], rule[:port]
+        end
+
+        {"CidrIp" => rule[:ip], "IpProtocol" => rule[:protocol], "FromPort" => from.to_i, "ToPort" => to.to_i}
+      else
+        {"SourceSecurityGroupName" => rule[:group], "SourceSecurityGroupOwnerId" => @owner_id}
+      end
+    end
+
     def add_ec2_rules(group_name, rules)
       rules.each do |rule|
-        if rule[:ip]
-          data = {"CidrIp" => rule[:ip], "IpProtocol" => rule[:protocol], "FromPort" => rule[:port], "ToPort" => rule[:port]}
-        else
-          data = {"SourceSecurityGroupName" => rule[:group], "SourceSecurityGroupOwnerId" => @owner_id}
-        end
+        data = format_ec2_rule(rule)
 
         puts "AUTHORIZE: #{data}"
         @aws.authorize_security_group_ingress(group_name, data)
@@ -35,11 +45,7 @@ module AWSSecurityGroups
 
     def remove_ec2_rules(group_name, rules)
       rules.each do |rule|
-        if rule[:ip]
-          data = {"CidrIp" => rule[:ip], "IpProtocol" => rule[:protocol], "FromPort" => rule[:port], "ToPort" => rule[:port]}
-        else
-          data = {"SourceSecurityGroupName" => rule[:group], "SourceSecurityGroupOwnerId" => @owner_id}
-        end
+        data = format_ec2_rule(rule)
 
         puts "REVOKING: #{data}"
         @aws.revoke_security_group_ingress(group_name, data)
