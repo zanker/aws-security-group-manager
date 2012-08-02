@@ -69,10 +69,16 @@ end
 # Summarize what changes we would be making
 def puts_rule(product, rule, prefix="")
   if product == "ec2"
-    if rule[:ip]
-      puts "#{prefix}IP range #{rule[:ip]} (#{@ip_to_name[rule[:ip]] || "unknown"}) on #{rule[:port]} over #{rule[:protocol]}"
+    if rule[:from_port] == rule[:to_port]
+      port = rule[:from_port]
     else
-      puts "#{prefix}Group #{rule[:group]}"
+      port = "#{rule[:from_port]}-#{rule[:to_port]}"
+    end
+
+    if rule[:ip]
+      puts "#{prefix}IP range #{rule[:ip]} (#{@ip_to_name[rule[:ip]] || "unknown"}) on #{port} over #{rule[:protocol]}"
+    else
+      puts "#{prefix}Group #{rule[:group]} on #{port} over #{rule[:protocol]}"
     end
   elsif product == "rds"
     if rule[:ip]
@@ -112,7 +118,7 @@ new_groups.each do |product, groups|
 
       # List any new rules
       list.sort {|a, b| (a[:ip] || a[:group]) <=> (b[:ip] || b[:group]) }.reverse.each do |rule|
-        rule_id = "#{rule[:ip]}#{rule[:group]}#{rule[:protocol]}#{rule[:port]}"
+        rule_id = "#{rule[:ip]}#{rule[:group]}#{rule[:protocol]}#{rule[:from_port]}#{rule[:to_port]}"
         added_rules[product][region][group_name][rule_id] = true
 
         next if core.security_groups[product][region][group_name][:rules][rule_id]

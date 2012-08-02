@@ -28,11 +28,11 @@ module AWSSecurityGroups
             next if rule["ipProtocol"] != "tcp" and rule["ipProtocol"] != "udp"
 
             rule["groups"].each do |group|
-              rules["#{group["groupName"]}"] = {:group => group["groupName"]}
+              rules["#{group["groupName"]}#{rule["ipProtocol"]}#{rule["fromPort"]}#{rule["toPort"]}"] = {:group => group["groupName"], :protocol => rule["ipProtocol"], :from_port => rule["fromPort"], :to_port => rule["toPort"]}
             end
 
             rule["ipRanges"].each do |ip|
-              rules["#{ip["cidrIp"]}#{rule["ipProtocol"]}#{rule["toPort"]}"] = {:ip => ip["cidrIp"], :protocol => rule["ipProtocol"], :port => rule["toPort"]}
+              rules["#{ip["cidrIp"]}#{rule["ipProtocol"]}#{rule["fromPort"]}#{rule["toPort"]}"] = {:ip => ip["cidrIp"], :protocol => rule["ipProtocol"], :from_port => rule["fromPort"], :to_port => rule["toPort"]}
             end
           end
 

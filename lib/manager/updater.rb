@@ -22,16 +22,12 @@ module AWSSecurityGroups
     # EC2
     def format_ec2_rule(rule)
       if rule[:ip]
-        if rule[:port] =~ /\-/
-          from, to = rule[:port].split("-", 2)
-        else
-          from, to = rule[:port], rule[:port]
-        end
-
-        {"CidrIp" => rule[:ip], "IpProtocol" => rule[:protocol], "FromPort" => from.to_i, "ToPort" => to.to_i}
+        data = {"IpRanges" => [{"CidrIp" => rule[:ip]}]}
       else
-        {"SourceSecurityGroupName" => rule[:group], "SourceSecurityGroupOwnerId" => @owner_id}
+        data = {"Groups" => [{"GroupName" => rule[:group], "UserId" => @owner_id}]}
       end
+
+      {"IpPermissions" => [data.merge("IpProtocol" => rule[:protocol], "FromPort" => rule[:from_port].to_i, "ToPort" => rule[:to_port].to_i)]}
     end
 
     def add_ec2_rules(group_name, rules)
