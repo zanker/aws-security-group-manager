@@ -3,7 +3,7 @@ require "yaml"
 
 module AWSSecurityGroups
   class Core
-    attr_reader :servers, :security_groups
+    attr_reader :servers, :security_groups, :owner_id
 
     def initialize(access_key, secret_key)
       @access_key, @secret_key = access_key, secret_key
@@ -37,6 +37,7 @@ module AWSSecurityGroups
           end
 
           @security_groups["ec2"][region][group.name] = {:group_id => group.group_id, :owner_id => group.owner_id, :rules => rules}
+          @owner_id = group.owner_id
         end
 
         @security_groups["ec2"].delete(region) if @security_groups["ec2"][region].empty?
@@ -59,6 +60,7 @@ module AWSSecurityGroups
           end
 
           @security_groups["rds"][region][group["DBSecurityGroupName"]] = {:owner_id => group["OwnerId"], :rules => rules}
+          @owner_id = group["OwnerId"]
         end
       end
     end
