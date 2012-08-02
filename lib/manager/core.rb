@@ -51,11 +51,11 @@ module AWSSecurityGroups
           rules = {}
 
           group["EC2SecurityGroups"].each do |data|
-            rules[data["EC2SecurityGroupName"]] = true
+            rules[data["EC2SecurityGroupName"]] = {:group => data["EC2SecurityGroupName"]}
           end
 
           group["IPRanges"].each do |ip|
-            rules[ip["CIDRIP"]] = true
+            rules[ip["CIDRIP"]] = {:ip => ip["CIDRIP"]}
           end
 
           @security_groups["rds"][region][group["DBSecurityGroupName"]] = {:owner_id => group["OwnerId"], :rules => rules}
