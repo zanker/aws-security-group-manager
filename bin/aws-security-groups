@@ -72,7 +72,7 @@ def puts_rule(product, rule, prefix="")
     if rule[:ip]
       puts "#{prefix}IP range #{rule[:ip]} (#{@ip_to_name[rule[:ip]] || "unknown"}) on #{rule[:port]} over #{rule[:protocol]}"
     else
-      puts "#{prefix}Group #{rule[:group]} on #{rule[:port]} over #{rule[:protocol]}"
+      puts "#{prefix}Group #{rule[:group]}"
     end
   elsif product == "rds"
     if rule[:ip]
