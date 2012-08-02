@@ -28,7 +28,7 @@ module AWSSecurityGroups
             next if rule["ipProtocol"] != "tcp" and rule["ipProtocol"] != "udp"
 
             rule["groups"].each do |group|
-              rules["#{group["groupName"]}#{rule["ipProtocol"]}#{rule["toPort"]}"] = {:group => group["groupName"], :protocol => rule["ipProtocol"], :port => rule["toPort"]}
+              rules["#{group["groupName"]}"] = {:group => group["groupName"]}
             end
 
             rule["ipRanges"].each do |ip|
