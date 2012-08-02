@@ -20,7 +20,7 @@ module AWSSecurityGroups
         if config["group"]
           groups, ips = self.find_servers(region, config)
           groups.each do |group|
-            compiled.push(:group => group, :port => config["port"], :protocol => config["protocol"])
+            compiled.push(:group => group)
           end
 
         # We're configuring an IP range to have access
