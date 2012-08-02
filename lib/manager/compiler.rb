@@ -59,7 +59,14 @@ module AWSSecurityGroups
 
           # Same region, so add the security group to itself
           if server_region == region
-            groups.push(config["group"])
+            if config["group"] == :ALL
+              instance[:group_names].each do |group|
+                groups.push(group)
+              end
+            else
+              groups.push(config["group"])
+            end
+
           # Different region, authorize the IP
           else
             ips.push("#{instance[:ip_address]}/32")
