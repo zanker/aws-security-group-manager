@@ -54,7 +54,7 @@ group_config.each do |product, settings|
 end
 
 # Easy map of ip -> name for clarity
-ip_to_name = {}
+@ip_to_name = {}
 core.servers["ec2"].each do |region, servers|
   servers.each do |instance_id, instance|
     name = instance[:tags]["Name"]
@@ -62,16 +62,35 @@ core.servers["ec2"].each do |region, servers|
       name = instance[:tags].inspect
     end
 
-    ip_to_name["#{instance[:ip_address]}/32"] = "#{instance[:az]}, #{name}"
+    @ip_to_name["#{instance[:ip_address]}/32"] = "#{instance[:az]}, #{name}"
   end
 end
 
 # Summarize what changes we would be making
-destructive_changes = {}
+def puts_rule(product, rule, prefix="")
+  if product == "ec2"
+    if rule[:ip]
+      puts "#{prefix}IP range #{rule[:ip]} (#{@ip_to_name[rule[:ip]] || "unknown"}) on #{rule[:port]} over #{rule[:protocol]}"
+    else
+      puts "#{prefix}Group #{rule[:group]} on #{rule[:port]} over #{rule[:protocol]}"
+    end
+  elsif product == "rds"
+    if rule[:ip]
+      puts "#{prefix}IP range #{rule[:ip]} (#{@ip_to_name[rule[:ip]] || "unknown"})"
+    else
+      puts "#{prefix}Group #{rule[:group]}"
+    end
+  end
+end
+
+added_rules, removed_rules = {}, {}
 
 puts
 new_groups.each do |product, groups|
   puts "**** Summary for #{product.upcase}"
+
+  added_rules[product] ||= {}
+  removed_rules[product] ||= {}
 
   regions = {}
   groups.each do |group_name, data|
@@ -84,56 +103,40 @@ new_groups.each do |product, groups|
   regions.each do |region, data|
     puts "** Region: #{region}"
 
+    added_rules[product][region] ||= {}
+    removed_rules[product][region] ||= {}
+
     data.each do |group_name, list|
       puts "* #{group_name}"
 
-      new_rules = {}
+      added_rules[product][region][group_name] = {}
+      removed_rules[product][region][group_name] = []
 
-      # List out all of the rules for this group on the region that are new
+      # List any new rules
       list.sort {|a, b| (a[:ip] || a[:group]) <=> (b[:ip] || b[:group]) }.reverse.each do |rule|
-        if product == "ec2"
-          if rule[:ip]
-            puts "IP range #{rule[:ip]} (#{ip_to_name[rule[:ip]] || "unknown"}) on #{rule[:port]} over #{rule[:protocol]}"
-          else
-            puts "Group #{rule[:group]} on #{rule[:port]} over #{rule[:protocol]}"
-          end
-        elsif product == "rds"
-          if rule[:ip]
-            puts "IP range #{rule[:ip]} (#{ip_to_name[rule[:ip]] || "unknown"})"
-          else
-            puts "Group #{rule[:group]}"
-          end
-        end
+        rule_id = "#{rule[:ip]}#{rule[:group]}#{rule[:protocol]}#{rule[:port]}"
+        added_rules[product][region][group_name][rule_id] = true
 
-        new_rules["#{rule[:ip]}#{rule[:group]}#{rule[:protocol]}#{rule[:port]}"] = true
+        next if core.security_groups[product][region][group_name][:rules][rule_id]
+        puts_rule(product, rule, "NEW: ")
+
+        added_rules[product][region][group_name][rule_id] = rule
       end
 
       # List anything we're removing
-      if options[:destructive]
-        destructive_changes[product] ||= {}
-        destructive_changes[product][region] ||= {}
-        destructive_changes[product][region][group_name] = []
-
-        core.security_groups[product][region][group_name][:rules].each do |id, rule|
-          next if new_rules[id]
-
-          if product == "ec2"
-            if rule[:ip]
-              puts "REMOVING: IP range #{rule[:ip]} (#{ip_to_name[rule[:ip]] || "unknown"}) on #{rule[:port]} over #{rule[:protocol]}"
-            else
-              puts "REMOVING: Group #{rule[:group]} on #{rule[:port]} over #{rule[:protocol]}"
-            end
-          else
-            if rule[:ip]
-              puts "REMOVING: IP range #{rule[:ip]} (#{ip_to_name[rule[:ip]] || "unknown"})"
-            else
-              puts "REMOVING: Group #{rule[:group]}"
-            end
-          end
-
-          destructive_changes[product][region][group_name].push(rule)
+      core.security_groups[product][region][group_name][:rules].each do |rule_id, rule|
+        # Already exists, no change
+        if added_rules[product][region][group_name][rule_id]
+          puts_rule(product, rule, "SAME: ")
+        # Removing it
+        elsif options[:destructive]
+          puts_rule(product, rule, "REMOVING: ")
+          removed_rules[product][region][group_name].push(rule)
         end
       end
+
+      added_rules[product][region][group_name] = added_rules[product][region][group_name].values
+      added_rules[product][region][group_name].delete_if {|v| v == true }
 
       puts
     end
@@ -166,3 +169,5 @@ unless options[:assumeyes]
     exit
   end
 end
+
+puts "Adding"
