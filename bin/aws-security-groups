@@ -25,7 +25,7 @@ if options[:aws_access_key].nil? or options[:aws_access_key] == ""
 end
 
 if options[:aws_secret_key].nil? or options[:aws_secret_key] == ""
-  puts "*** No AWS Secret Ley specified"
+  puts "*** No AWS Secret Key specified"
   exit
 end
 
@@ -165,9 +165,48 @@ unless options[:assumeyes]
 
   confirm = gets.chomp
   unless confirm.to_s.downcase == "confirm"
-    puts ""
+    puts "Exited, no changes made."
     exit
   end
 end
 
-puts "Adding"
+puts
+puts "Here we go..."
+puts
+
+new_groups.each_key do |product|
+  # First add any new rules so if something breaks, it won't lock out people
+  if added_rules[product]
+    added_rules[product].each do |region, groups|
+      updater = AWSSecurityGroups::Updater.new(:product => product, :region => region, :owner_id => core.owner_id, :access_key => options[:aws_access_key], :secret_key => options[:aws_secret_key])
+
+      groups.each do |name, rules|
+        next if rules.empty?
+
+        puts
+        puts "Adding rules for #{product.upcase} in #{region} for #{name}"
+        updater.add_rules(name, rules)
+      end
+    end
+  end
+
+  # Then remove
+  if options[:destructive] and removed_rules[product]
+    puts
+
+    removed_rules[product].each do |region, groups|
+      updater = AWSSecurityGroups::Updater.new(:product => product, :region => region, :owner_id => core.owner_id, :access_key => options[:aws_access_key], :secret_key => options[:aws_secret_key])
+
+      groups.each do |name, rules|
+        next if rules.empty?
+
+        puts
+        puts "Removing rules for #{product.upcase} in #{region} for #{name}"
+        updater.remove_rules(name, rules)
+      end
+    end
+  end
+
+  puts
+  puts
+end
