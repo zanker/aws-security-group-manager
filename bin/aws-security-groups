@@ -13,32 +13,156 @@ OptionParser.new do |opts|
   opts.on("--config", "-s", String, :REQUIRED, "Configuration file to base security group changes off of") {|v| options[:config] = v}
   opts.on("--assumeyes", "-y", :OPTIONAL, "Doesn't confirm before changing security groups") {|v| options[:assumeyes] = true}
   opts.on("--noop", :OPTIONAL, "No changes are made, just a list of changes it would make and it exits") {|v| options[:noop] = true}
+  opts.on("--destructive", :OPTIONAL, "If a security gorup is being managed and a rule isn't found, it will remove it") {|v| options[:destructive] = true}
 
-  opts.on("--aws-access-key", "-O", String, :OPTIONAL, "AWS Access key to use. Defaults to the value of AWS_ACCESS_KEY") {|v| options[:aws_access_key] = v}
-  opts.on("--aws-secret-key", "-W", String, :OPTIONAL, "AWS Secret key to use. Defaults to the value of AWS_SECRET_KEY") {|v| options[:aws_secret_key] = v}
+  opts.on("--aws-access-key", "-O", String, :OPTIONAL, "AWS Access Key to use. Defaults to the value of AWS_ACCESS_KEY") {|v| options[:aws_access_key] = v}
+  opts.on("--aws-secret-key", "-W", String, :OPTIONAL, "AWS Secret Key to use. Defaults to the value of AWS_SECRET_KEY") {|v| options[:aws_secret_key] = v}
 end.parse!
 
 if options[:aws_access_key].nil? or options[:aws_access_key] == ""
-  puts "*** No AWS Access key specified"
+  puts "*** No AWS Access Ley specified"
   exit
 end
 
 if options[:aws_secret_key].nil? or options[:aws_secret_key] == ""
-  puts "*** No AWS Secret key specified"
+  puts "*** No AWS Secret Ley specified"
   exit
 end
 
 unless File.exists?(options[:config])
-  puts "*** Cannot laod configuration file"
+  puts "*** Cannot load configuration file"
   exit
 end
 
-core = EC2SecurityGroups::Core.new(options[:aws_access_key], options[:aws_secret_key])
+core = AWSSecurityGroups::Core.new(options[:aws_access_key], options[:aws_secret_key])
+
+puts "Loading regions"
 core.load_regions
-core.load_security_groups
+
+puts "Loading server list"
 core.load_servers
 
+puts "Loading security groups"
+core.load_security_groups
+
+new_groups = {}
+
 group_config = YAML::load(File.read(options[:config]))
-group_config.each do |product, config|
-  core.build_security_groups(product, config)
+group_config.each do |product, settings|
+  puts "Compiling security groups for #{product.upcase}"
+  new_groups[product] = core.compile_security_groups(product, settings)
+end
+
+# Easy map of ip -> name for clarity
+ip_to_name = {}
+core.servers["ec2"].each do |region, servers|
+  servers.each do |instance_id, instance|
+    name = instance[:tags]["Name"]
+    if !name
+      name = instance[:tags].inspect
+    end
+
+    ip_to_name["#{instance[:ip_address]}/32"] = "#{instance[:az]}, #{name}"
+  end
+end
+
+# Summarize what changes we would be making
+destructive_changes = {}
+
+puts
+new_groups.each do |product, groups|
+  puts "**** Summary for #{product.upcase}"
+
+  regions = {}
+  groups.each do |group_name, data|
+    data.each do |region, group|
+      regions[region] ||= {}
+      regions[region][group_name] = group
+    end
+  end
+
+  regions.each do |region, data|
+    puts "** Region: #{region}"
+
+    data.each do |group_name, list|
+      puts "* #{group_name}"
+
+      new_rules = {}
+
+      # List out all of the rules for this group on the region that are new
+      list.sort {|a, b| (a[:ip] || a[:group]) <=> (b[:ip] || b[:group]) }.reverse.each do |rule|
+        if product == "ec2"
+          if rule[:ip]
+            puts "IP range #{rule[:ip]} (#{ip_to_name[rule[:ip]] || "unknown"}) on #{rule[:port]} over #{rule[:protocol]}"
+          else
+            puts "Group #{rule[:group]} on #{rule[:port]} over #{rule[:protocol]}"
+          end
+        elsif product == "rds"
+          if rule[:ip]
+            puts "IP range #{rule[:ip]} (#{ip_to_name[rule[:ip]] || "unknown"})"
+          else
+            puts "Group #{rule[:group]}"
+          end
+        end
+
+        new_rules["#{rule[:ip]}#{rule[:group]}#{rule[:protocol]}#{rule[:port]}"] = true
+      end
+
+      # List anything we're removing
+      if options[:destructive]
+        destructive_changes[product] ||= {}
+        destructive_changes[product][region] ||= {}
+        destructive_changes[product][region][group_name] = []
+
+        core.security_groups[product][region][group_name][:rules].each do |id, rule|
+          next if new_rules[id]
+
+          if product == "ec2"
+            if rule[:ip]
+              puts "REMOVING: IP range #{rule[:ip]} (#{ip_to_name[rule[:ip]] || "unknown"}) on #{rule[:port]} over #{rule[:protocol]}"
+            else
+              puts "REMOVING: Group #{rule[:group]} on #{rule[:port]} over #{rule[:protocol]}"
+            end
+          else
+            if rule[:ip]
+              puts "REMOVING: IP range #{rule[:ip]} (#{ip_to_name[rule[:ip]] || "unknown"})"
+            else
+              puts "REMOVING: Group #{rule[:group]}"
+            end
+          end
+
+          destructive_changes[product][region][group_name].push(rule)
+        end
+      end
+
+      puts
+    end
+
+    puts
+  end
+
+  puts
+end
+
+# Nope, we're done
+if options[:noop]
+  puts "--noop, no changes made"
+  exit
+end
+
+# Confirm
+unless options[:assumeyes]
+  puts "**** ARE YOU SURE ****"
+
+  if options[:destructive]
+    puts "This will make destructive changes to your security groups and remove anything listed under \"Destructive\". Please make sure the changes are correct."
+  end
+
+  print "Type [Confirm] to change: "
+
+  confirm = gets.chomp
+  unless confirm.to_s.downcase == "confirm"
+    puts ""
+    exit
+  end
 end
