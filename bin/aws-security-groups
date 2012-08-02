@@ -90,6 +90,7 @@ def puts_rule(product, rule, prefix="")
 end
 
 added_rules, removed_rules = {}, {}
+has_destructive = nil
 
 puts
 new_groups.each do |product, groups|
@@ -136,6 +137,8 @@ new_groups.each do |product, groups|
         elsif options[:destructive] and !removed_rules[product][region][group_name][rule_id]
           puts_rule(product, rule, "REMOVING: ")
           removed_rules[product][region][group_name][rule_id] = rule
+
+          has_destructive = true
         end
       end
 
@@ -164,7 +167,11 @@ unless options[:assumeyes]
   puts "**** ARE YOU SURE ****"
 
   if options[:destructive]
-    puts "This will make destructive changes to your security groups and remove anything listed under \"Destructive\". Please make sure the changes are correct."
+    if has_destructive
+      puts "This will make destructive changes to your security groups and remove anything listed under \"Destructive\". Please make sure the changes are correct."
+    else
+      puts "Destructive changes are enabled, but no changes require a rule to be removed."
+    end
   end
 
   print "Type [Confirm] to change: "
@@ -214,5 +221,7 @@ new_groups.each_key do |product|
   end
 
   puts
-  puts
 end
+
+puts
+puts "Finished"
