@@ -10,6 +10,7 @@ module AWSSecurityGroups
       end
 
       compiled = []
+      added_groups = []
 
       group_config.each do |config|
         if product == "ec2"
@@ -19,9 +20,7 @@ module AWSSecurityGroups
         # We're configuring a group to have access
         if config["group"]
           groups, ips = self.find_servers(region, config)
-          groups.each do |group|
-            compiled.push(:group => group)
-          end
+          added_groups.concat(groups)
 
         # We're configuring an IP range to have access
         elsif config["ip"]
@@ -32,6 +31,9 @@ module AWSSecurityGroups
           compiled.push(:ip => ip, :port => config["port"], :protocol => config["protocol"])
         end
       end
+
+      added_groups.uniq!
+      added_groups.each {|v| compiled.push(:group => v)}
 
       compiled
     end
@@ -74,7 +76,6 @@ module AWSSecurityGroups
         end
       end
 
-      groups.uniq!
       return groups, ips
     end
   end

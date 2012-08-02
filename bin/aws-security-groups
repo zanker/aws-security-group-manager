@@ -118,7 +118,6 @@ new_groups.each do |product, groups|
         added_rules[product][region][group_name][rule_id] = true
 
         next if core.security_groups[product][region][group_name][:rules][rule_id]
-        next if added_rules[product][region][group_name][rule_id].is_a?(Hash)
 
         puts_rule(product, rule, "NEW: ")
 
