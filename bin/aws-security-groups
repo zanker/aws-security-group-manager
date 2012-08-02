@@ -101,16 +101,14 @@ new_groups.each do |product, groups|
   end
 
   regions.each do |region, data|
-    puts "** Region: #{region}"
-
     added_rules[product][region] ||= {}
     removed_rules[product][region] ||= {}
 
     data.each do |group_name, list|
-      puts "* #{group_name}"
+      puts "** #{region}, #{group_name}"
 
       added_rules[product][region][group_name] = {}
-      removed_rules[product][region][group_name] = []
+      removed_rules[product][region][group_name] = {}
 
       # List any new rules
       list.sort {|a, b| (a[:ip] || a[:group]) <=> (b[:ip] || b[:group]) }.reverse.each do |rule|
@@ -118,26 +116,27 @@ new_groups.each do |product, groups|
         added_rules[product][region][group_name][rule_id] = true
 
         next if core.security_groups[product][region][group_name][:rules][rule_id]
-
         puts_rule(product, rule, "NEW: ")
 
         added_rules[product][region][group_name][rule_id] = rule
       end
 
-      # List anything we're removing
       core.security_groups[product][region][group_name][:rules].each do |rule_id, rule|
         # Already exists, no change
         if added_rules[product][region][group_name][rule_id]
           puts_rule(product, rule, "SAME: ")
+
         # Removing it
-        elsif options[:destructive]
+        elsif options[:destructive] and !removed_rules[product][region][group_name][rule_id]
           puts_rule(product, rule, "REMOVING: ")
-          removed_rules[product][region][group_name].push(rule)
+          removed_rules[product][region][group_name][rule_id] = rule
         end
       end
 
       added_rules[product][region][group_name] = added_rules[product][region][group_name].values
       added_rules[product][region][group_name].delete_if {|v| v == true }
+
+      removed_rules[product][region][group_name] = removed_rules[product][region][group_name].values
 
       puts
     end
