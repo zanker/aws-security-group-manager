@@ -2,9 +2,9 @@ require "fog"
 require "yaml"
 
 module AWSSecurityGroups
-  attr_reader :servers
-
   class Core
+    attr_reader :servers, :security_groups
+
     def initialize(access_key, secret_key)
       @access_key, @secret_key = access_key, secret_key
     end
@@ -23,7 +23,20 @@ module AWSSecurityGroups
 
         aws = Fog::Compute.new(:provider => "AWS", :region => region, :aws_access_key_id => @access_key, :aws_secret_access_key => @secret_key)
         aws.security_groups.each do |group|
-          @security_groups["ec2"][region][group.name] = {:group_id => group.group_id, :owner_id => group.owner_id, :permissions => group.ip_permissions}
+          rules = {}
+          group.ip_permissions.each do |rule|
+            next if rule["ipProtocol"] != "tcp" and rule["ipProtocol"] != "udp"
+
+            rule["groups"].each do |group|
+              rules["#{group["groupName"]}#{rule["ipProtocol"]}#{rule["toPort"]}"] = {:group => group["groupName"], :protocol => rule["ipProtocol"], :port => rule["toPort"]}
+            end
+
+            rule["ipRanges"].each do |ip|
+              rules["#{ip["cidrIp"]}#{rule["ipProtocol"]}#{rule["toPort"]}"] = {:ip => ip["cidrIp"], :protocol => rule["ipProtocol"], :port => rule["toPort"]}
+            end
+          end
+
+          @security_groups["ec2"][region][group.name] = {:group_id => group.group_id, :owner_id => group.owner_id, :rules => rules}
         end
 
         @security_groups["ec2"].delete(region) if @security_groups["ec2"][region].empty?
@@ -35,7 +48,17 @@ module AWSSecurityGroups
 
         rds = Fog::AWS::RDS.new(:region => region, :aws_access_key_id => @access_key, :aws_secret_access_key => @secret_key)
         rds.describe_db_security_groups.body["DescribeDBSecurityGroupsResult"]["DBSecurityGroups"].each do |group|
-          @security_groups["rds"][region][group["DBSecurityGroupName"]] = {:owner_id => group["OwnerId"], :ec2 => group["EC2SecurityGroups"], :ip => group["IPRanges"]}
+          rules = {}
+
+          group["EC2SecurityGroups"].each do |data|
+            rules[data["EC2SecurityGroupName"]] = true
+          end
+
+          group["IPRanges"].each do |ip|
+            rules[ip["CIDRIP"]] = true
+          end
+
+          @security_groups["rds"][region][group["DBSecurityGroupName"]] = {:owner_id => group["OwnerId"], :rules => rules}
         end
       end
     end
@@ -50,7 +73,7 @@ module AWSSecurityGroups
         aws = Fog::Compute.new(:provider => "AWS", :region => region, :aws_access_key_id => @access_key, :aws_secret_access_key => @secret_key)
         aws.describe_instances("instance-state-name" => "running").body["reservationSet"].each do |instance|
           instance_set = instance["instancesSet"].first
-          @servers["ec2"][region][instance_set["instanceId"]] = {:group_names => instance["groupSet"], :group_ids => instance["groupIds"], :ip_address => instance_set["ipAddress"]}
+          @servers["ec2"][region][instance_set["instanceId"]] = {:tags => instance_set["tagSet"], :az => instance_set["placement"]["availabilityZone"], :group_names => instance["groupSet"], :group_ids => instance["groupIds"], :ip_address => instance_set["ipAddress"]}
         end
 
         @servers["ec2"].delete(region) if @servers["ec2"][region].empty?
