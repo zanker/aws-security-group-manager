@@ -20,28 +20,30 @@ module AWSSecurityGroups
 
     private
     # EC2
-    def format_for_aws(rules)
-      rules.map do |rule|
+    def add_ec2_rules(group_name, rules)
+      rules.each do |rule|
         if rule[:ip]
-          {"IpRanges" => [{"CidrIp" => rule[:ip]}], "IpProtocol" => rule[:protocol], "FromPort" => rule[:port], "ToPort" => rule[:port]}
+          data = {"CidrIp" => rule[:ip], "IpProtocol" => rule[:protocol], "FromPort" => rule[:port], "ToPort" => rule[:port]}
         else
-          {"Groups" => [{"GroupName" => rule[:group], "UserId" => @owner_id}]}
+          data = {"SourceSecurityGroupName" => rule[:group], "SourceSecurityGroupOwnerId" => @owner_id}
         end
+
+        puts "AUTHORIZE: #{data}"
+        @aws.authorize_security_group_ingress(group_name, data)
       end
     end
 
-    def add_ec2_rules(group_name, rules)
-      data = {"IpPermissions" => format_for_aws(rules)}
-
-      puts "AUTHORIZE: #{data}"
-      @aws.authorize_security_group_ingress(group_name, data)
-    end
-
     def remove_ec2_rules(group_name, rules)
-      data = {"IpPermissions" => format_for_aws(rules)}
+      rules.each do |rule|
+        if rule[:ip]
+          data = {"CidrIp" => rule[:ip], "IpProtocol" => rule[:protocol], "FromPort" => rule[:port], "ToPort" => rule[:port]}
+        else
+          data = {"SourceSecurityGroupName" => rule[:group], "SourceSecurityGroupOwnerId" => @owner_id}
+        end
 
-      puts "REVOKING: #{data}"
-      @aws.revoke_security_group_ingress(group_name, data)
+        puts "REVOKING: #{data}"
+        @aws.revoke_security_group_ingress(group_name, data)
+      end
     end
 
     # RDS
