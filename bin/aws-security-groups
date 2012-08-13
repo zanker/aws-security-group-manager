@@ -20,7 +20,7 @@ OptionParser.new do |opts|
 end.parse!
 
 if options[:aws_access_key].nil? or options[:aws_access_key] == ""
-  puts "*** No AWS Access Ley specified"
+  puts "*** No AWS Access Key specified"
   exit
 end
 
