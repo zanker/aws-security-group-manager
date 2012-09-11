@@ -13,7 +13,7 @@ OptionParser.new do |opts|
   opts.on("--config", "-s", String, :REQUIRED, "Configuration file to base security group changes off of") {|v| options[:config] = v}
   opts.on("--assumeyes", "-y", :OPTIONAL, "Doesn't confirm before changing security groups") {|v| options[:assumeyes] = true}
   opts.on("--noop", :OPTIONAL, "No changes are made, just a list of changes it would make and it exits") {|v| options[:noop] = true}
-  opts.on("--destructive", :OPTIONAL, "If a security gorup is being managed and a rule isn't found, it will remove it") {|v| options[:destructive] = true}
+  opts.on("--destructive", :OPTIONAL, "If a security group is being managed and a rule isn't found, it will remove it") {|v| options[:destructive] = true}
 
   opts.on("--aws-access-key", "-O", String, :OPTIONAL, "AWS Access Key to use. Defaults to the value of AWS_ACCESS_KEY") {|v| options[:aws_access_key] = v}
   opts.on("--aws-secret-key", "-W", String, :OPTIONAL, "AWS Secret Key to use. Defaults to the value of AWS_SECRET_KEY") {|v| options[:aws_secret_key] = v}
