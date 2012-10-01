@@ -58,7 +58,7 @@ module AWSSecurityGroups
         end
 
         puts "AUTHORIZE: #{data}"
-        @aws.authorize_db_security_group_ingress_ingress(group_name, {"CIDRIP" => rule[:ip]})
+        @aws.authorize_db_security_group_ingress(group_name, {"CIDRIP" => rule[:ip]})
       end
     end
 
