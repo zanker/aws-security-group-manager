@@ -50,13 +50,12 @@ module AWSSecurityGroups
     # Find servers and groups matching the ruleset given
     def find_servers(region, config)
       groups, ips = [], []
-
+      
+      if config["region"] == :SAME
+        return [config["group"]], ips
+      end
+      
       @servers.each do |server_region, list|
-        # Only add servers that are part of the security group in the same region as this security group
-        if config["region"] == :SAME and region != server_region
-          next
-        end
-
         # Only add servers that are part of the security group in a specific region
         if config["region"].is_a?(String) and config["region"] != server_region
           next
