@@ -14,6 +14,11 @@ module AWSSecurityGroups
 
       group_config.each do |config|
         if product == "ec2"
+          unless config.has_key?("protocol") and config.has_key?("port")
+            puts "WARNING: #{product}, #{group_name}, #{group_config}"
+            puts "Cannot find protocol and/or port"
+          end
+          
           next unless config["protocol"] and config["port"]
 
           if config["port"].is_a?(String)
