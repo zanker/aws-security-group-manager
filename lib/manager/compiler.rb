@@ -60,6 +60,13 @@ module AWSSecurityGroups
         return [config["group"]], ips
       end
       
+      skip = {}
+      if config["skip"].is_a?(Array)
+        config["skip"].each {|k| skip[k] = true}
+      elsif config["skip"].is_a?(String)
+        skip[config["skip"]] = true
+      end
+      
       @servers.each do |server_region, list|
         # Only add servers that are part of the security group in a specific region
         if config["region"].is_a?(String) and config["region"] != server_region
@@ -71,6 +78,16 @@ module AWSSecurityGroups
           if config["group"].is_a?(String) and !instance[:group_names].include?(config["group"])
             next
           end
+          
+          skip_instance = nil
+          instance[:group_names].each do |group|
+            if skip[group]
+              skip_instance = true
+              break
+            end
+          end
+          
+          next if skip_instance
 
           # Same region, so add the security group to itself
           if server_region == region
