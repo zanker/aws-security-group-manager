@@ -3,6 +3,8 @@ $LOAD_PATH.unshift File.expand_path(File.dirname(__FILE__) + "/../lib")
 
 require "optparse"
 require "aws-security-group-manager"
+require "deep_merge"
+require "pp"
 
 options = {:aws_access_key => ENV["AWS_ACCESS_KEY"], :aws_secret_key => ENV["AWS_SECRET_KEY"]}
 
@@ -10,7 +12,7 @@ OptionParser.new do |opts|
   opts.banner = "Usage: #{__FILE__} [options]"
 
   opts.separator("")
-  opts.on("--config", "-s", String, :REQUIRED, "Configuration file to base security group changes off of") {|v| options[:config] = v}
+  opts.on("--config", "-s", String, :REQUIRED, "Configuration file (or directory of files) to base security group changes off of") {|v| options[:config] = v}
   opts.on("--assumeyes", "-y", :OPTIONAL, "Doesn't confirm before changing security groups") {|v| options[:assumeyes] = true}
   opts.on("--noop", :OPTIONAL, "No changes are made, just a list of changes it would make and it exits") {|v| options[:noop] = true}
   opts.on("--destructive", :OPTIONAL, "If a security group is being managed and a rule isn't found, it will remove it") {|v| options[:destructive] = true}
@@ -45,10 +47,23 @@ core.load_servers
 puts "Loading security groups"
 core.load_security_groups
 
-new_groups = {}
 
-group_config = YAML::load(File.read(options[:config]))
-group_config.each do |product, settings|
+files = []
+if File.directory?(options[:config])
+  puts options[:config]
+  files = Dir.glob("#{options[:config]}/*.yml")
+else
+  files.push(options[:config])
+end
+
+configs = {}
+files.each do |file|
+  group_config = YAML::load(File.read(file))
+  configs.deep_merge(group_config)
+end
+
+new_groups = {}
+configs.each do |product, settings|
   puts "Compiling security groups for #{product.upcase}"
   new_groups[product] = core.compile_security_groups(product, settings)
 end
