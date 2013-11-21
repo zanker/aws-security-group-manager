@@ -51,7 +51,7 @@ core.load_security_groups
 files = []
 if File.directory?(options[:config])
   puts options[:config]
-  files = Dir.glob("#{options[:config]}/*.yml")
+  files = Dir.glob("#{options[:config]}/*.{yaml,yml}")
 else
   files.push(options[:config])
 end
