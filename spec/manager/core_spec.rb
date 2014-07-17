@@ -1,6 +1,6 @@
 require "spec_helper"
 
-describe EC2SecurityGroups::Core do
+describe AWSSecurityGroups::Core do
 
 
 end

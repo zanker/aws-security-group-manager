@@ -1,2 +1,4 @@
 .idea
 security-groups.yml
+vendor/
+.bundle
